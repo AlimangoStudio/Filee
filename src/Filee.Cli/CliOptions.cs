@@ -22,9 +22,13 @@ internal sealed record CliOptions
 
     public bool Zip { get; set; }
     public double? SettleSeconds { get; set; }
+    public string? Rules { get; set; }
+    public string? Root { get; set; }
+    public string? Log { get; set; }
+    public bool Execute { get; set; }
     public string? Error { get; set; }
 
-    public static readonly string[] Commands = ["convert", "watch", "formats", "presets", "help", "version"];
+    public static readonly string[] Commands = ["convert", "watch", "organize", "formats", "presets", "help", "version"];
 
     public static CliOptions Parse(IReadOnlyList<string> args)
     {
@@ -97,6 +101,18 @@ internal sealed record CliOptions
                 case "--keep-dates":
                     options.KeepDates = true;
                     break;
+                case "--rules":
+                    options.Rules = Value();
+                    break;
+                case "--root":
+                    options.Root = Value();
+                    break;
+                case "--log":
+                    options.Log = Value();
+                    break;
+                case "--execute":
+                    options.Execute = true;
+                    break;
                 case "--zip":
                     options.Zip = true;
                     break;
@@ -127,6 +143,8 @@ internal sealed record CliOptions
             "convert" when options.Inputs.Count == 0 => "Give at least one file or folder to convert.",
             "convert" or "watch" when options.To is null == (options.Preset is null) => "Use either --to <format> or --preset <preset>.",
             "watch" when options.Inputs.Count != 1 => "Give exactly one folder to watch.",
+            "organize" when options.Inputs.Count == 0 => "Give at least one folder to organize.",
+            "organize" when options.Rules is null == (options.Root is null) => "Use either --root <folder> or --rules <file>.",
             _ => null,
         };
         return options;

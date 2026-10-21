@@ -6,6 +6,7 @@ using System.Text.Json;
 using Filee.Core.Conversion;
 using Filee.Core.Formats;
 using Filee.Core.Localization;
+using Filee.Core.Organizing;
 using Filee.Core.Platform;
 using Filee.Core.Presets;
 using Filee.Core.Watching;
@@ -45,6 +46,7 @@ internal static class Cli
         {
             "convert" => await ConvertAsync(options, host, output, errors, cancellationToken),
             "watch" => await WatchAsync(options, host, output, errors, cancellationToken),
+            "organize" => await OrganizeAsync(options, host, output, errors, cancellationToken),
             "formats" => ListFormats(options, host, output, errors),
             _ => ListPresets(host, output),
         };
@@ -117,6 +119,49 @@ internal static class Cli
         {
         }
         return Success;
+    }
+
+    private static async Task<int> OrganizeAsync(CliOptions options, CliHost host, TextWriter output, TextWriter errors, CancellationToken cancellationToken)
+    {
+        OrganizeRules rules;
+        try
+        {
+            rules = options.Rules is not null ? OrganizeRules.Load(options.Rules) : OrganizeRules.Defaults(Path.GetFullPath(options.Root!));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException)
+        {
+            errors.WriteLine($"filee: can't read the rules: {e.Message}");
+            return UsageError;
+        }
+        var missing = options.Inputs.Where(f => !Directory.Exists(f)).ToList();
+        foreach (var folder in missing)
+            errors.WriteLine($"filee: not a folder: {folder}");
+        if (missing.Count > 0)
+            return UsageError;
+
+        var plan = options.Inputs
+            .SelectMany(f => OrganizePlanner.Enumerate(Path.GetFullPath(f), options.Recursive, rules))
+            .Select(f => OrganizePlanner.Plan(f, rules, Organizer.DateOf))
+            .ToList();
+        if (plan.Count == 0)
+        {
+            errors.WriteLine("filee: no files to organize.");
+            return NothingToDo;
+        }
+
+        var log = Path.GetFullPath(options.Log ?? "organize-log.tsv");
+        var organizer = new Organizer(rules, host, options.Quiet ? TextWriter.Null : output, log);
+        await organizer.RunAsync(plan, options.Execute, cancellationToken);
+
+        var moves = plan.Count(p => p.Action == OrganizeAction.Move);
+        var converts = plan.Count(p => p.Action == OrganizeAction.ConvertAndMove);
+        if (!options.Execute)
+        {
+            output.WriteLine($"Dry run: {moves} to move, {converts} to convert and move, {organizer.Left} left in place. Nothing was changed; add --execute to do it.");
+            return Success;
+        }
+        output.WriteLine($"Moved {organizer.Moved}, converted {organizer.Converted}, left {organizer.Left}, failed {organizer.Failed}. Log: {log}");
+        return organizer.Failed == 0 ? Success : SomeFailed;
     }
 
     /// <summary>Runs one job and prints each file's result as soon as it is final (when <paramref name="output"/> is given).</summary>

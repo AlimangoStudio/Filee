@@ -13,6 +13,7 @@ internal static class Help
     {
         "convert" => Convert,
         "watch" => Watch,
+        "organize" => Organize,
         "formats" => "Usage: filee formats [<format>]\n\nLists every format, or what one format converts to.\n",
         "presets" => "Usage: filee presets\n\nLists the presets saved in Filee (built-in and your own).\n",
         _ => General,
@@ -25,6 +26,7 @@ internal static class Help
           filee convert <files or folders...> --to <format> [options]
           filee convert <files or folders...> --preset <preset> [options]
           filee watch <folder> --to <format> [options]
+          filee organize <folders...> (--root <folder> | --rules <file>) [--execute]
           filee formats [<format>]
           filee presets
           filee help [<command>]
@@ -35,6 +37,7 @@ internal static class Help
           filee convert *.png --to webp --quality 80 -o converted
           filee convert D:\Scans --recursive --preset to-pdf
           filee watch D:\Inbox --to pdf --move-originals
+          filee organize C:\Users\me\Downloads --root E:\Storage --recursive
 
         Presets and engines are the ones in the Filee app. Exit codes: 0 all converted, 1 some failed,
         2 wrong arguments or a missing input, 3 nothing to convert.
@@ -58,6 +61,34 @@ internal static class Help
               --zip              Save the result of each file as one ZIP (a Shapefile's files together)
               --json             Print the result as JSON (for scripts and other programs)
               --quiet            Print nothing but errors
+
+        """;
+
+    private const string Organize = """
+        Usage: filee organize <folders...> (--root <folder> | --rules <file>) [options]
+
+        Files pictures, videos, documents, audio and archives into one folder per kind, by date, and converts odd
+        picture and video formats on the way so each kind ends up in one format. Other files are left alone.
+
+        Without --execute it only shows what it would do. With --execute it works one file at a time: a converted
+        original is deleted only after the result is checked (the picture decodes at the same size, the video has a
+        picture and the same playing time); a file moved to another drive is compared byte for byte before the
+        source is removed. Every step is written to a tab-separated log.
+
+        --root <folder> uses the default rules:
+          Pictures  <root>\Pictures\<year>\<year-month>   HEIC, HEIF, PNG, WebP, TIFF, BMP -> JPG (RAW stays RAW)
+          Videos    <root>\Videos\<year>\<year-month>     MOV, AVI, 3GP, MTS, M2TS, WMV, MPG, MKV -> MP4
+          Documents <root>\Documents\<PDF|Word|Excel|PowerPoint|Text|Other>   (not converted)
+          Audio     <root>\Audio\<year>                    Archives  <root>\Archives
+        --rules <file> reads your own rules (JSON: Destinations, ConvertTo, JpgQuality, SkipFolders).
+
+        Options:
+              --root <folder>    File everything under this folder with the default rules
+              --rules <file>     Your own rules
+          -r, --recursive        Include sub folders (code, app data and .git folders are skipped)
+              --execute          Do it (without it nothing changes)
+              --log <file>       Where to write the log (default: organize-log.tsv here)
+              --quiet            Print only the summary
 
         """;
 
